@@ -79,6 +79,7 @@ class Experience(models.Model):
     description =  models.TextField(verbose_name='Descripcion')
     year = models.CharField(max_length=100, verbose_name="Año")
     company = models.CharField(max_length=150, verbose_name="Compañia")
+    orden = models.IntegerField(default=0)
     created = models.DateField(auto_now_add=True, verbose_name='Creacion' )
     updated = models.DateField(auto_now=True, verbose_name='Actualizacion' )
 

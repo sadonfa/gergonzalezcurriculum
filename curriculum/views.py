@@ -53,7 +53,7 @@ class SkillsDesings(APIView):
 class Experiences(APIView):
 
     def get(self, request):
-        data = ModExperience.objects.order_by('-id').all()
+        data = ModExperience.objects.order_by('-orden').all()
         data_json = ExperienceSerializer(data, many=True)
 
         return JsonResponse({"data": data_json.data}, status=HTTPStatus.OK)
@@ -62,7 +62,7 @@ class Experiences(APIView):
 class Trainings(APIView):
 
     def get(self, request):
-        data = ModTrainings.objects.order_by('-id').all()
+        data = ModTrainings.objects.order_by('-year').all()
         data_json = TrainingSerializer(data, many=True)
 
         return JsonResponse({"data": data_json.data}, status=HTTPStatus.OK)
