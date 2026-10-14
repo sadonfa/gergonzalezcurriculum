@@ -1,4 +1,57 @@
+# ==========================================
+# SECRETOS Y ENTORNOS (CRÍTICO DE SEGURIDAD)
+# ==========================================
 .env
-*.pyc
-.env
+.env.*
+!.env.example
+
+# ==========================================
+# ARCHIVOS COMPILADOS Y CACHÉ DE PYTHON
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ==========================================
+# ENTORNOS VIRTUALES
+# ==========================================
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+/venv/
+/env/
+
+# ==========================================
+# ARCHIVOS Y DUMPS DE BASE DE DATOS
+# ==========================================
+*.sqlite3
+*.db
 *.sql
+*.sql.gz
+curriculum_backup.sql
+
+# ==========================================
+# ARCHIVOS MULTIMEDIA SUBIDOS POR USUARIOS (OPCIONAL)
+# ==========================================
+# Descomentar si no deseas subir archivos subidos por admin en pruebas
+# /media/
+
+# ==========================================
+# ARCHIVOS DE CONFIGURACIÓN DE EDITORES / IDEs
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ==========================================
+# REPORTES DE PRUEBAS Y COBERTURA
+# ==========================================
+.coverage
+htmlcov/
+.pytest_cache/

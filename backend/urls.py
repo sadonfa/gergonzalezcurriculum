@@ -25,6 +25,11 @@ urlpatterns = [
     path('api/v1/', include('curriculum.urls')),
     path('api/v1/', include('portafolio.urls')),
     path('api/v1/', include('blog.urls')),
+
+    # ruta para el portal GEGOVA
+    path('api/portal/', include('portal.urls')),
+
+    
     path('', include('core.urls')),
     path('admin/', admin.site.urls),
 ]   

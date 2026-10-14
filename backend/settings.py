@@ -47,14 +47,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_ckeditor_5',
+    'rest_framework',
+    'corsheaders',
     'core',
     'about',
     'curriculum',
     'portafolio',
-    'blog',
-    'django_ckeditor_5',
-    'rest_framework',
-    'corsheaders',
+    'blog',    
+    'portal',
 ]
 
 MIDDLEWARE = [
@@ -115,6 +116,19 @@ DATABASES = {
 }
 
 
+
+# Configuración de Correo SMTP
+# Configuracion SMTP - GEGOVA
+
+EMAIL_HOST = 'mail.gegova.com.co'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'info@gegova.com.co'
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = 'GEGOVA Soluciones <info@gegova.com.co>'
+
+
+
 # REST_FRAMEWORK = {
 #     # Use Django's standard `django.contrib.auth` permissions,
 #     # or allow read-only access for unauthenticated users.
@@ -125,10 +139,14 @@ DATABASES = {
 
 # CORS HEADERS
 CORS_ALLOWED_ORIGINS = [
+    'http://127.0.0.1:5173',      # <-- Agregado para Vite/React local
+    'http://localhost:5173',      # <-- Agregado para Vite/React local
     'http://127.0.0.1:3000',
     'http://localhost:3000',
+    'https://gegova.com.co',
+    'https://www.gegova.com.co',
     'https://api.gegova.com.co',
-    'https://curriculum.gegova.com.co'
+    'https://curriculom.gegova.com.co',
 ]
 
 # Password validation
