@@ -105,7 +105,7 @@ def procesar_pago_wompi(request):
 
         estado_transaccion = data_wompi.get('data', {}).get('status')
         
-        if response.status_code == 201 and (estado_transaccion == 'APPROVED' or estado_transaccion == 'PENDING'):
+        if response.status_code == 201 and estado_transaccion == 'APPROVED':
             transaccion_id = data_wompi['data']['id']
 
             # --- NUEVO: Guardar el registro en la Base de Datos de Django ---
