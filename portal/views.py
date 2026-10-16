@@ -45,39 +45,23 @@ def registrar_contacto(request):
             status=status.HTTP_201_CREATED
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def procesar_pago_wompi(request):
-    token_tarjeta = request.data.get('token')
-    precio = request.data.get('precio')
-    producto_id = request.data.get('producto_id')
-    producto_titulo = request.data.get('producto_titulo', producto_id)
-    
-    nombre_cliente = request.data.get('nombre_cliente', 'Cliente GEGOVA')
-    email_cliente = request.data.get('email_cliente')
-    telefono_cliente = request.data.get('telefono_cliente', 'No especificado')
-
-    if not token_tarjeta or not precio or not email_cliente:
-        return Response({"error": "Faltan datos requeridos (token, precio o correo)."}, status=status.HTTP_400_BAD_REQUEST)
-
-    monto_centavos = int(precio) * 100 
-    moneda = "COP"
-
-    tiempo_actual = int(time.time() * 1000)
-    referencia_unica = f"GEGOVA_{producto_id}_{tiempo_actual}"
-
-    secreto_integridad = getattr(settings, 'WOMPI_INTEGRITY_SECRET', 'test_secret_dummy')
-    
-    cadena_a_firmar = f"{referencia_unica}{monto_centavos}{moneda}{secreto_integridad}"
-    firma_sha256 = hashlib.sha256(cadena_a_firmar.encode('utf-8')).hexdigest()
-
-    headers = {
-        "Authorization": f"Bearer {settings.WOMPI_PRIVATE_KEY}",
-        "Content-Type": "application/json"
-    }
-
     try:
+        # --- Obtención de datos del payload ---
+        datos = request.data
+        nombre_cliente = datos.get('nombre_cliente')
+        email_cliente = datos.get('email_cliente')
+        telefono_cliente = datos.get('telefono_cliente')
+        producto_id = datos.get('producto_id')
+        producto_titulo = datos.get('producto_titulo')
+        precio = datos.get('precio')
+        token_tarjeta = datos.get('token_tarjeta')
+        monto_centavos = int(float(precio) * 100)
+        moneda = "COP"
+        referencia_unica = f"GEGOVA-{producto_id}-{int(time.time())}"
+
+        # --- Obtener token de aceptación de Wompi ---
         merchant_res = requests.get(f"https://production.wompi.co/v1/merchants/{settings.WOMPI_PUBLIC_KEY}")
         merchant_data = merchant_res.json()
         acceptance_token = merchant_data.get('data', {}).get('presigned_acceptance', {}).get('acceptance_token')
@@ -85,6 +69,7 @@ def procesar_pago_wompi(request):
         if not acceptance_token:
             return Response({"error": "No se pudo obtener el token de aceptación de Wompi."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # --- Crear Transacción en Wompi ---
         url_transaccion = "https://production.wompi.co/v1/transactions"
         payload = {
             "amount_in_cents": monto_centavos,
@@ -96,19 +81,23 @@ def procesar_pago_wompi(request):
                 "installments": 1
             },
             "reference": referencia_unica,
-            "acceptance_token": acceptance_token,
-            "signature": firma_sha256
+            "acceptance_token": acceptance_token
+        }
+        headers = {
+            "Authorization": f"Bearer {settings.WOMPI_PRIVATE_KEY}",
+            "Content-Type": "application/json"
         }
 
         response = requests.post(url_transaccion, json=payload, headers=headers)
         data_wompi = response.json()
 
         estado_transaccion = data_wompi.get('data', {}).get('status')
-        
-        if response.status_code == 201 and estado_transaccion == 'APPROVED':
+
+        # PERMITIR 'APPROVED' Y 'PENDING' (En producción real los cobros inician como PENDING)
+        if response.status_code == 201 and estado_transaccion in ['APPROVED', 'PENDING']:
             transaccion_id = data_wompi['data']['id']
 
-            # --- NUEVO: Guardar el registro en la Base de Datos de Django ---
+            # Guardar registro en la Base de Datos
             try:
                 TransaccionPago.objects.create(
                     nombre_cliente=nombre_cliente,
@@ -124,71 +113,80 @@ def procesar_pago_wompi(request):
             except Exception as db_error:
                 print(f"Error al guardar transacción en BD: {db_error}")
 
+            # SOLO SI NACE COMO 'APPROVED' SE ENVIAN CORREOS INMEDIATOS
+            # (Si nace como 'PENDING', el Webhook se encargará de enviarlos cuando el banco confirme)
+            if estado_transaccion == 'APPROVED':
+                # 1. CORREO AL ADMIN (info@gegova.com.co)
+                try:
+                    asunto_admin = f"🚨 ¡NUEVA VENTA! - {producto_titulo}"
+                    mensaje_admin = (
+                        f"Se ha procesado un nuevo pago exitoso en GEGOVA:\n\n"
+                        f"👤 DATOS DEL CLIENTE:\n"
+                        f"• Nombre: {nombre_cliente}\n"
+                        f"• Correo: {email_cliente}\n"
+                        f"• Teléfono / WhatsApp: {telefono_cliente}\n\n"
+                        f"📦 DETALLES DEL PEDIDO:\n"
+                        f"• Producto: {producto_titulo} (ID: {producto_id})\n"
+                        f"• Valor Pagado: ${precio} COP\n"
+                        f"• Referencia Wompi: {transaccion_id}\n\n"
+                        f"⚠️ ACCIÓN REQUERIDA:\n"
+                        f"Por favor adquiere la licencia/producto y envíasela al cliente a su correo ({email_cliente})."
+                    )
+                    send_mail(
+                        asunto_admin,
+                        mensaje_admin,
+                        settings.DEFAULT_FROM_EMAIL,
+                        ['dirsistemas@gegova.com.co'],
+                        fail_silently=False,
+                    )
+                except Exception as e:
+                    print(f"Error al enviar notificación a admin: {e}")
 
-            # 1. CORREO DE ALERTA PARA TI (info@gegova.com.co)
-            try:
-                asunto_admin = f"🚨 ¡NUEVA VENTA! - {producto_titulo}"
-                mensaje_admin = (
-                    f"Se ha procesado un nuevo pago exitoso en GEGOVA:\n\n"
-                    f"👤 DATOS DEL CLIENTE:\n"
-                    f"• Nombre: {nombre_cliente}\n"
-                    f"• Correo: {email_cliente}\n"
-                    f"• Teléfono / WhatsApp: {telefono_cliente}\n\n"
-                    f"📦 DETALLES DEL PEDIDO:\n"
-                    f"• Producto: {producto_titulo} (ID: {producto_id})\n"
-                    f"• Valor Pagado: ${precio} COP\n"
-                    f"• Referencia Wompi: {data_wompi['data']['id']}\n\n"
-                    f"⚠️ ACCIÓN REQUERIDA:\n"
-                    f"Por favor adquiere la licencia/producto y envíasela al cliente a su correo ({email_cliente})."
-                )
-                send_mail(
-                    asunto_admin,
-                    mensaje_admin,
-                    settings.DEFAULT_FROM_EMAIL,
-                    ['dirsistemas@gegova.com.co'],
-                    fail_silently=False,
-                )
-            except Exception as e:
-                print(f"Error al enviar notificación a admin: {e}")
+                # 2. CORREO HTML AL CLIENTE
+                try:
+                    asunto_cliente = f"¡Pago recibido con éxito! - {producto_titulo} | GEGOVA"
+                    contexto_email = {
+                        'nombre_cliente': nombre_cliente,
+                        'producto_titulo': producto_titulo,
+                        'precio': f"{int(precio):,}".replace(",", "."),
+                        'transaccion_id': transaccion_id,
+                    }
+                    html_message = render_to_string('emails/confirmacion_pago.html', contexto_email)
+                    plain_message = f"Hola {nombre_cliente}, hemos confirmado tu pago por {producto_titulo}. En unos momentos recibirás tu producto."
 
-            # 2. CORREO AUTOMÁTICO DE CONFIRMACIÓN PARA EL CLIENTE
-            # 2. CORREO HTML ELEGANTE PARA EL CLIENTE
-            try:
-                asunto_cliente = f"¡Pago recibido con éxito! - {producto_titulo} | GEGOVA"
-                
-                # Contexto para alimentar la plantilla HTML
-                contexto_email = {
-                    'nombre_cliente': nombre_cliente,
-                    'producto_titulo': producto_titulo,
-                    'precio': f"{int(precio):,}".replace(",", "."), # Formatea precio ej: 85.000
-                    'transaccion_id': transaccion_id,
-                }
-                
-                # Renderizar la plantilla HTML
-                html_message = render_to_string('emails/confirmacion_pago.html', contexto_email)
-                plain_message = f"Hola {nombre_cliente}, hemos confirmado tu pago por {producto_titulo}. En unos momentos recibirás tu producto."
+                    send_mail(
+                        subject=asunto_cliente,
+                        message=plain_message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[email_cliente],
+                        html_message=html_message,
+                        fail_silently=False
+                    )
+                except Exception as e:
+                    print(f"Error correo HTML cliente: {e}")
 
-                send_mail(
-                    subject=asunto_cliente,
-                    message=plain_message, # Versión texto plano de respaldo
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email_cliente],
-                    html_message=html_message, # <-- AQUÍ SE ENVÍA EL HTML
-                    fail_silently=False
-                )
-            except Exception as e:
-                print(f"Error correo HTML cliente: {e}")
+            # Respuesta limpia de éxito para el Frontend
+            return Response({
+                "status": "success",
+                "estado": estado_transaccion,
+                "transaccion": transaccion_id,
+                "mensaje": "Transacción procesada correctamente."
+            }, status=status.HTTP_200_OK)
 
-            return Response({"mensaje": "¡Pago procesado exitosamente!", "transaccion": transaccion_id}, status=status.HTTP_200_OK)
         else:
-            error_msg = data_wompi.get('error', {}).get('messages', 'Pago declinado.')
+            # Captura limpia de errores devueltos por Wompi
+            error_data = data_wompi.get('error', {})
+            if isinstance(error_data, dict):
+                error_msg = error_data.get('messages', 'La transacción fue declinada por la entidad bancaria.')
+            else:
+                error_msg = 'La transacción fue declinada por la entidad bancaria.'
+
             print(f"Error detallado de Wompi en backend: {data_wompi}")
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     except Exception as e:
         print(f"Excepción interna en Django: {e}")
-        return Response({"error": "Error interno al procesar el pago."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response({"error": f"Error interno en el servidor: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
