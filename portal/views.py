@@ -45,23 +45,45 @@ def registrar_contacto(request):
             status=status.HTTP_201_CREATED
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-@api_view(['POST'])
-def procesar_pago_wompi(request):
-    try:
-        # --- Obtención de datos del payload ---
-        datos = request.data
-        nombre_cliente = datos.get('nombre_cliente')
-        email_cliente = datos.get('email_cliente')
-        telefono_cliente = datos.get('telefono_cliente')
-        producto_id = datos.get('producto_id')
-        producto_titulo = datos.get('producto_titulo')
-        precio = datos.get('precio')
-        token_tarjeta = datos.get('token_tarjeta')
-        monto_centavos = int(float(precio) * 100)
-        moneda = "COP"
-        referencia_unica = f"GEGOVA-{producto_id}-{int(time.time())}"
 
-        # --- Obtener token de aceptación de Wompi ---
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def procesar_pago_wompi(request):
+    # 1. Obtener token aceptando cualquier variante de clave desde el frontend
+    token_tarjeta = (
+        request.data.get('token') or 
+        request.data.get('token_tarjeta') or 
+        request.data.get('token_id')
+    )
+    precio = request.data.get('precio')
+    producto_id = request.data.get('producto_id')
+    producto_titulo = request.data.get('producto_titulo', producto_id)
+
+    nombre_cliente = request.data.get('nombre_cliente', 'Cliente GEGOVA')
+    email_cliente = request.data.get('email_cliente')
+    telefono_cliente = request.data.get('telefono_cliente', 'No especificado')
+
+    if not token_tarjeta or not precio or not email_cliente:
+        return Response({"error": "Faltan datos requeridos (token, precio o correo)."}, status=status.HTTP_400_BAD_REQUEST)
+
+    monto_centavos = int(float(precio)) * 100
+    moneda = "COP"
+
+    tiempo_actual = int(time.time() * 1000)
+    referencia_unica = f"GEGOVA_{producto_id}_{tiempo_actual}"
+
+    secreto_integridad = getattr(settings, 'WOMPI_INTEGRITY_SECRET', 'test_secret_dummy')
+
+    cadena_a_firmar = f"{referencia_unica}{monto_centavos}{moneda}{secreto_integridad}"
+    firma_sha256 = hashlib.sha256(cadena_a_firmar.encode('utf-8')).hexdigest()
+
+    headers = {
+        "Authorization": f"Bearer {settings.WOMPI_PRIVATE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        # Obtener token de aceptación
         merchant_res = requests.get(f"https://production.wompi.co/v1/merchants/{settings.WOMPI_PUBLIC_KEY}")
         merchant_data = merchant_res.json()
         acceptance_token = merchant_data.get('data', {}).get('presigned_acceptance', {}).get('acceptance_token')
@@ -69,7 +91,6 @@ def procesar_pago_wompi(request):
         if not acceptance_token:
             return Response({"error": "No se pudo obtener el token de aceptación de Wompi."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # --- Crear Transacción en Wompi ---
         url_transaccion = "https://production.wompi.co/v1/transactions"
         payload = {
             "amount_in_cents": monto_centavos,
@@ -81,11 +102,8 @@ def procesar_pago_wompi(request):
                 "installments": 1
             },
             "reference": referencia_unica,
-            "acceptance_token": acceptance_token
-        }
-        headers = {
-            "Authorization": f"Bearer {settings.WOMPI_PRIVATE_KEY}",
-            "Content-Type": "application/json"
+            "acceptance_token": acceptance_token,
+            "signature": firma_sha256
         }
 
         response = requests.post(url_transaccion, json=payload, headers=headers)
@@ -93,11 +111,11 @@ def procesar_pago_wompi(request):
 
         estado_transaccion = data_wompi.get('data', {}).get('status')
 
-        # PERMITIR 'APPROVED' Y 'PENDING' (En producción real los cobros inician como PENDING)
+        # ACEPTAR TANTO 'APPROVED' COMO 'PENDING'
         if response.status_code == 201 and estado_transaccion in ['APPROVED', 'PENDING']:
             transaccion_id = data_wompi['data']['id']
 
-            # Guardar registro en la Base de Datos
+            # --- Guardar registro en la Base de Datos ---
             try:
                 TransaccionPago.objects.create(
                     nombre_cliente=nombre_cliente,
@@ -113,10 +131,9 @@ def procesar_pago_wompi(request):
             except Exception as db_error:
                 print(f"Error al guardar transacción en BD: {db_error}")
 
-            # SOLO SI NACE COMO 'APPROVED' SE ENVIAN CORREOS INMEDIATOS
-            # (Si nace como 'PENDING', el Webhook se encargará de enviarlos cuando el banco confirme)
+            # ENVIAR CORREOS ÚNICAMENTE SI SE APROBÓ INMEDIATAMENTE
             if estado_transaccion == 'APPROVED':
-                # 1. CORREO AL ADMIN (info@gegova.com.co)
+                # 1. CORREO DE ALERTA PARA TI (info@gegova.com.co)
                 try:
                     asunto_admin = f"🚨 ¡NUEVA VENTA! - {producto_titulo}"
                     mensaje_admin = (
@@ -142,15 +159,17 @@ def procesar_pago_wompi(request):
                 except Exception as e:
                     print(f"Error al enviar notificación a admin: {e}")
 
-                # 2. CORREO HTML AL CLIENTE
+                # 2. CORREO HTML ELEGANTE PARA EL CLIENTE
                 try:
                     asunto_cliente = f"¡Pago recibido con éxito! - {producto_titulo} | GEGOVA"
+
                     contexto_email = {
                         'nombre_cliente': nombre_cliente,
                         'producto_titulo': producto_titulo,
-                        'precio': f"{int(precio):,}".replace(",", "."),
+                        'precio': f"{int(float(precio)):,}".replace(",", "."),
                         'transaccion_id': transaccion_id,
                     }
+
                     html_message = render_to_string('emails/confirmacion_pago.html', contexto_email)
                     plain_message = f"Hola {nombre_cliente}, hemos confirmado tu pago por {producto_titulo}. En unos momentos recibirás tu producto."
 
@@ -165,21 +184,36 @@ def procesar_pago_wompi(request):
                 except Exception as e:
                     print(f"Error correo HTML cliente: {e}")
 
-            # Respuesta limpia de éxito para el Frontend
             return Response({
-                "status": "success",
-                "estado": estado_transaccion,
+                "mensaje": "¡Pago procesado exitosamente!",
                 "transaccion": transaccion_id,
-                "mensaje": "Transacción procesada correctamente."
+                "estado": estado_transaccion
             }, status=status.HTTP_200_OK)
 
         else:
-            # Captura limpia de errores devueltos por Wompi
+            # Captura limpia de errores para evitar enviar objetos desestructurados
             error_data = data_wompi.get('error', {})
             if isinstance(error_data, dict):
-                error_msg = error_data.get('messages', 'La transacción fue declinada por la entidad bancaria.')
+                messages = error_data.get('messages', 'Pago declinado.')
+                if isinstance(messages, dict):
+                    partes = []
+                    for k, v in messages.items():
+                        if isinstance(v, list):
+                            partes.append(f"{k}: {', '.join(v)}")
+                        elif isinstance(v, dict):
+                            for sub_k, sub_v in v.items():
+                                partes.append(f"{k}.{sub_k}: {', '.join(sub_v) if isinstance(sub_v, list) else sub_v}")
+                        else:
+                            partes.append(f"{k}: {v}")
+                    error_msg = " | ".join(partes) if partes else 'Pago declinado.'
+                elif isinstance(messages, str):
+                    error_msg = messages
+                else:
+                    error_msg = 'Pago declinado.'
+            elif isinstance(error_data, str):
+                error_msg = error_data
             else:
-                error_msg = 'La transacción fue declinada por la entidad bancaria.'
+                error_msg = 'Pago declinado.'
 
             print(f"Error detallado de Wompi en backend: {data_wompi}")
             return Response({"error": error_msg}, status=status.HTTP_400_BAD_REQUEST)
