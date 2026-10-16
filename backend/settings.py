@@ -149,6 +149,11 @@ CORS_ALLOWED_ORIGINS = [
     'https://curriculom.gegova.com.co',
 ]
 
+WOMPI_PRIVATE_KEY=env('WOMPI_PRIVATE_KEY')
+WOMPI_PUBLIC_KEY=env('WOMPI_PUBLIC_KEY')
+WOMPI_INTEGRITY_SECRET=env('WOMPI_INTEGRITY_SECRET')
+WOMPI_EVENTS_SECRET = env('WOMPI_EVENTS_SECRET')
+
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 

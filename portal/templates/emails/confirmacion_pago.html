@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #07111c;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #edf5fb;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: #0d1d2b;
+      border: 1px solid #2b4051;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .header {
+      background: #091723;
+      padding: 25px;
+      text-align: center;
+      border-bottom: 1px solid #2b4051;
+    }
+    .brand-title {
+      color: #63f0c0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin: 0;
+    }
+    .content {
+      padding: 30px;
+    }
+    .status-badge {
+      display: inline-block;
+      background: rgba(99, 240, 192, 0.1);
+      color: #63f0c0;
+      border: 1px solid #24483f;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0 0 10px 0;
+      color: #edf5fb;
+    }
+    p {
+      color: #9aafc0;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .order-card {
+      background: #091723;
+      border: 1px solid #2b4051;
+      border-radius: 6px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .order-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #1a2d3d;
+      font-size: 13px;
+    }
+    .order-row:last-child {
+      border-bottom: none;
+    }
+    .label {
+      color: #9aafc0;
+    }
+    .value {
+      color: #edf5fb;
+      font-weight: 600;
+    }
+    .next-steps {
+      background: #0b2630;
+      border-left: 3px solid #63f0c0;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 25px;
+    }
+    .next-steps h3 {
+      margin: 0 0 6px 0;
+      color: #63f0c0;
+      font-size: 14px;
+    }
+    .next-steps p {
+      margin: 0;
+      font-size: 13px;
+      color: #c7d6e0;
+    }
+    .footer {
+      background: #06101a;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #647c8e;
+      border-top: 1px solid #2b4051;
+    }
+    .btn-support {
+      display: inline-block;
+      margin-top: 15px;
+      color: #63f0c0;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <div class="brand-title">GEGOVA</div>
+      <div style="font-size: 10px; color: #8bbcff; letter-spacing: 1px; margin-top: 3px;">SOLUCIONES DIGITALES & CIBERSEGURIDAD</div>
+    </div>
+    
+    <div class="content">
+      <div class="status-badge">✔ Pago Confirmado</div>
+      <h1>¡Gracias por tu compra, {{ nombre_cliente }}!</h1>
+      <p>Hemos verificado y recibido tu pago correctamente. A continuación encuentras los detalles de tu orden:</p>
+      
+      <div class="order-card">
+        <table width="100%" cellpadding="6" cellspacing="0">
+          <tr>
+            <td class="label">Producto:</td>
+            <td class="value" align="right">{{ producto_titulo }}</td>
+          </tr>
+          <tr>
+            <td class="label">Monto Pagado:</td>
+            <td class="value" align="right">${{ precio }} COP</td>
+          </tr>
+          <tr>
+            <td class="label">ID de Transacción:</td>
+            <td class="value" align="right" style="font-size: 11px; color: #8bbcff;">{{ transaccion_id }}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="next-steps">
+        <h3>📩 ¿Cuándo recibirás tu producto?</h3>
+        <p>En unos momentos uno de nuestros ingenieros procesará tu orden y te enviará la clave de activación e instrucciones de instalación directamente a este correo.</p>
+      </div>
+
+      <div style="text-align: center; margin-top: 25px;">
+        <a href="https://wa.me/573011493468" class="btn-support">¿Tienes alguna duda? Escríbenos por WhatsApp ↗</a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>© 2026 GEGOVA Soluciones Digitales. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>
