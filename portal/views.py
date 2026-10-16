@@ -78,14 +78,14 @@ def procesar_pago_wompi(request):
     }
 
     try:
-        merchant_res = requests.get(f"https://sandbox.wompi.co/v1/merchants/{settings.WOMPI_PUBLIC_KEY}")
+        merchant_res = requests.get(f"https://production.wompi.co/v1/merchants/{settings.WOMPI_PUBLIC_KEY}")
         merchant_data = merchant_res.json()
         acceptance_token = merchant_data.get('data', {}).get('presigned_acceptance', {}).get('acceptance_token')
 
         if not acceptance_token:
             return Response({"error": "No se pudo obtener el token de aceptación de Wompi."}, status=status.HTTP_400_BAD_REQUEST)
 
-        url_transaccion = "https://sandbox.wompi.co/v1/transactions"
+        url_transaccion = "https://production.wompi.co/v1/transactions"
         payload = {
             "amount_in_cents": monto_centavos,
             "currency": moneda,
@@ -105,7 +105,7 @@ def procesar_pago_wompi(request):
 
         estado_transaccion = data_wompi.get('data', {}).get('status')
         
-        if response.status_code == 201 and (estado_transaccion == 'APPROVED' or estado_transaccion == 'PENDING'):
+        if response.status_code == 201 and estado_transaccion == 'APPROVED':
             transaccion_id = data_wompi['data']['id']
 
             # --- NUEVO: Guardar el registro en la Base de Datos de Django ---
