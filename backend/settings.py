@@ -139,14 +139,14 @@ DEFAULT_FROM_EMAIL = 'GEGOVA Soluciones <info@gegova.com.co>'
 
 # CORS HEADERS
 CORS_ALLOWED_ORIGINS = [
-    'http://127.0.0.1:5173',      # <-- Agregado para Vite/React local
-    'http://localhost:5173',      # <-- Agregado para Vite/React local
+    'http://127.0.0.1:5173',      
+    'http://localhost:5173',     
     'http://127.0.0.1:3000',
     'http://localhost:3000',
     'https://gegova.com.co',
     'https://www.gegova.com.co',
     'https://api.gegova.com.co',
-    'https://curriculom.gegova.com.co',
+    'https://curriculum.gegova.com.co',
 ]
 
 WOMPI_PRIVATE_KEY=env('WOMPI_PRIVATE_KEY')
