@@ -36,3 +36,15 @@ class Post(models.Model):
         ordering = ['-published']
     def __str__(self):
         return self.title
+
+class Curriculum(models.Model):
+    title = models.CharField(max_length=100, default="Curriculum Vitae")
+    archivo = models.FileField(upload_to='cv/')
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Curriculum"
+        verbose_name_plural = "Curriculums"
+
+    def __str__(self):
+        return f"{self.title} - {self.fecha_actualizacion.strftime('%Y-%m-%d')}"

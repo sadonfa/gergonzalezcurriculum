@@ -1,4 +1,4 @@
-from .models import Post, Category
+from .models import Post, Category, Curriculum
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
@@ -27,3 +27,8 @@ class PostSerializer(serializers.ModelSerializer):
       model = Post
       fields = ['id', 'title', 'description', 'category_name', 'author_db']
       # fields = '__all__'
+
+class CurriculumSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Curriculum
+        fields = ['id', 'title', 'archivo', 'fecha_actualizacion']
